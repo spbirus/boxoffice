@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Box Office Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css')}}">
+</head>
+
+<body>
+    <h1>Box Office Dashboard</h1>
+
+    <div class='dashboard-grid'>
+        <div id='top-ten-movies'>
+            <h2>Top 10 Highest Grossing Films</h2>
+            <h4>Avg: <span id="gross-average"></span></h4>
+            <ol id="gross-movies">
+            </ol>
+        </div>
+
+        <div id='top-ten-movies-by-studio'>
+            <h2>Top 10 by <span id="studio-name">Studio</span>
+                <select id='studio-select'>                       
+                </select>
+            </h2>
+            <h4>Avg: <span id="studio-average"></span></h4>
+            <ol id='studio-movies'>
+            </ol>
+        </div>
+
+        <div id='top-ten-movies-by-opening-weekend'>
+            <h2>Top 10 by Opening Weekend Gross</h2>
+            <h4>Avg: <span id="opening-average"></span></h4>
+            <ol id="opening-movies">
+            </ol>
+        </div>
+
+        <div id='movie-list-complete'></div>
+    </div>
+    <script>
+        var movies;
+
+        // Helper function to format numbers with commas and '$'.
+        function formatNumbers(number, currency) {
+            if (number) {
+                number = number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                if (currency) {
+                    number = '$' + number;
+                }
+            }
+            return number
+        }
+
+        // Get the movies via AJAX from API collection once DOM Content is all loaded.
+        document.addEventListener('DOMContentLoaded', function() {
+            var request = new XMLHttpRequest();
+
+            request.onreadystatechange = function() {
+                if (request.readyState === XMLHttpRequest.DONE) {
+                    if (request.status === 200) {
+                        movies = JSON.parse(request.responseText);
+                        // console.log(movies)
+                        // Use a custom event to trigger the population of when
+                        // they are loaded.
+                        window.dispatchEvent(new Event('moviesLoaded'));
+                    }
+                }
+            }
+
+            request.open('GET', "{{ url_for('movies') }}");
+            request.send();
+        });
+
+        // Load the table of all movies.
+        var movieListDiv = document.getElementById('movie-list-complete')
+
+        // Custom event handler fired once movies are all loaded via AJAX.
+        window.addEventListener('moviesLoaded', function(e) {
+            var movieTable = document.createElement('table');
+            var header = document.createElement('tr');
+
+            var titleHead = document.createElement('th');
+            titleHead.textContent = 'Title';
+
+            var studioHead = document.createElement('th');
+            studioHead.textContent = 'Studio';
+
+            var totalGrossHead = document.createElement('th');
+            totalGrossHead.textContent = 'Total Gross';
+
+            var totalTheatersHead = document.createElement('th');
+            totalTheatersHead.textContent = 'Total Theaters';
+
+            var openingGrossHead = document.createElement('th');
+            openingGrossHead.textContent = 'Opening Gross';
+
+            var openingTheatersHead = document.createElement('th');
+            openingTheatersHead.textContent = 'Opening Theaters';
+
+            header.append(titleHead);
+            header.append(studioHead);
+            header.append(totalGrossHead);
+            header.append(totalTheatersHead);
+            header.append(openingGrossHead);
+            header.append(openingTheatersHead);
+            movieTable.append(header);
+
+            movies.forEach(function(item, idx, arr) {
+                var mRow = document.createElement('tr');
+                var mTitle = document.createElement('td');
+                var mStudio = document.createElement('td');
+                var mTotalGross = document.createElement('td');
+                var mTotalTheaters = document.createElement('td');
+                var mOpeningGross = document.createElement('td');
+                var mOpeningTheaters = document.createElement('td');
+
+                mTitle.textContent = item.title;
+                mStudio.textContent = item.studio;
+                mTotalGross.textContent = formatNumbers(item.total_gross, true);
+                mTotalTheaters.textContent = formatNumbers(item.total_theaters, false);
+                mOpeningGross.textContent = formatNumbers(item.opening_gross, true);
+                mOpeningTheaters.textContent = formatNumbers(item.opening_theaters, false);
+
+                mRow.append(mTitle);
+                mRow.append(mStudio);
+                mRow.append(mTotalGross);
+                mRow.append(mTotalTheaters);
+                mRow.append(mOpeningGross);
+                mRow.append(mOpeningTheaters);
+
+                movieTable.append(mRow);
+            });
+
+            movieListDiv.append(movieTable);
+
+            movies_copy = JSON.parse(JSON.stringify(movies));
+
+            //----------------------------------------
+            // top grossing
+
+            var topGrossing = movies_copy.sort(function(a, b) {
+                return parseFloat(b.total_gross) - parseFloat(a.total_gross);
+            });
+            var ol = document.getElementById('gross-movies');
+            topGrossing = topGrossing.filter(function(elem, index){
+                if(index <= 9){
+                    return elem;
+                }
+            });
+            var sum = 0;
+            topGrossing.map(function(elem, index){
+                sum += elem["total_gross"];
+                var li = document.createElement("li");
+                li.innerHTML = elem["title"] + " " + formatNumbers(elem["total_gross"], true) ;
+                ol.appendChild(li);
+            });
+            
+            var gross_avg = document.getElementById('gross-average');
+            gross_avg.innerHTML = formatNumbers(sum / 10, true); 
+
+            //----------------------------------------
+            //top 10 by studio
+
+            //populate the select button
+            var dropdown = document.getElementById("studio-select");
+            var studio_array = ['select'];
+            topStudio = movies_copy.filter(function(elem,index){
+                studio_array.push(elem["studio"]);
+            });
+            unique_studio = studio_array.filter(function(item, pos) {
+                return studio_array.indexOf(item) == pos;
+            })
+            unique_studio.map(function(elem, index){
+                var option = document.createElement("option");
+                option.innerHTML = elem;
+                dropdown.appendChild(option);
+            });
+            
+            //event listener to check when it changes
+            dropdown.addEventListener("change", function(){
+                // top studio grossing
+                var name = document.getElementById('studio-name')
+                name.innerHTML = getSelectedText("studio-select");
+
+                var ol = document.getElementById('studio-movies');
+                ol.innerHTML = "";
+                // filter based on studio
+                var topStudioGrossing = movies_copy.filter(function(elem,index){
+                    if(elem["studio"] == getSelectedText("studio-select")){
+                        return elem;
+                    }
+                });
+                // filter based on index
+                topStudioGrossing = topStudioGrossing.filter(function(elem, index){
+                    if(index<=9){
+                        return elem;
+                    }
+                });
+                topStudioGrossing = topStudioGrossing.sort(function(a,b){
+                    return parseFloat(b.total_gross) - parseFloat(a.total_gross);
+                });
+                var studioSum = 0;
+                var studioNum = 0;
+                topStudioGrossing.map(function(elem, index){
+                    studioSum += elem["total_gross"];
+                    studioNum++;
+                    var li = document.createElement("li");
+                    li.innerHTML = elem["title"] + " " + formatNumbers(elem["total_gross"], true);
+                    ol.appendChild(li);
+                });
+                
+                var studio_avg = document.getElementById('studio-average');
+                studio_avg.innerHTML = formatNumbers(studioSum / studioNum, true);
+                
+            });
+            
+
+                            
+            //----------------------------------------
+            // top opening grossing
+
+            var topOpenGrossing = movies_copy.sort(function(a, b) {
+                return parseFloat(b.opening_gross) - parseFloat(a.opening_gross);
+            });
+            var ol = document.getElementById('opening-movies');
+            topOpenGrossing = topOpenGrossing.filter(function(elem, index){
+                if(index <= 9){
+                    return elem;
+                }
+            });
+            var openSum = 0;
+            topOpenGrossing.map(function(elem, index){
+                openSum += elem["opening_gross"];
+                var li = document.createElement("li");
+                li.innerHTML = elem["title"] + " " + formatNumbers(elem["opening_gross"], true);
+                ol.appendChild(li);
+            });
+            
+            var open_avg = document.getElementById('opening-average');
+            open_avg.innerHTML = formatNumbers(openSum / 10, true); 
+
+            // console.log(movies_copy);
+            // console.log(movies);
+        });
+
+        // function to get the selected item from the dropdown
+        function getSelectedText(elementId) {
+            var elt = document.getElementById(elementId);
+
+            if (elt.selectedIndex == -1)
+                return null;
+
+            return elt.options[elt.selectedIndex].text;
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,23 @@
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 3;
+    grid-template-rows: 2;
+}
+
+#top-ten-movies {
+    grid-column: 1;
+}
+
+#top-ten-movies-by-studio {
+    grid-column: 2;
+}
+
+#top-ten-movies-by-opening-weekend {
+    grid-column: 3;
+}
+
+#movie-list-complete {
+    grid-row: 2;
+    grid-column-start: 1;
+    grid-column-end: 3;
+}
